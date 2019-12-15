@@ -1,0 +1,17 @@
+{
+  "license": "MIT",
+  "scripts": {
+    "clean": "bsb -clean-world",
+    "build:bsb": "bsb -make-world",
+    "build": "run-s build:bsb",
+    "watch:bsb": "bsb -make-world -w",
+    "jest": "jest",
+    "watch:jest": "jest --watchAll",
+    "test": "run-p watch:bsb watch:jest"
+  },
+  "devDependencies": {
+    "@glennsl/bs-jest": "^0.4.9",
+    "bs-platform": "^7.0.1",
+    "npm-run-all": "^4.1.5"
+  }
+}
