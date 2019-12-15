@@ -21,6 +21,8 @@ module String = struct
     String.concat "" lst
 end
 
+exception Malformed of string
+
 type error = string
 type stream = string
 type character = string
@@ -29,24 +31,66 @@ type 'a t = Parser of (stream -> (('a * stream), error) Belt.Result.t)
 let run (Parser inner_fn) input =
   inner_fn input
 
+let bind parser fn =
+  let inner_fn input =
+    match run parser input with
+    | Error _ as err -> err
+    | Ok (value, remaining) ->
+      run (fn value) remaining
+  in
+  Parser inner_fn
+
+let (>>=) = bind
+
+let return x =
+  let inner_fn input =
+    Ok (x, input)
+  in
+  Parser inner_fn
+
+
+let map parser f =
+  let inner_fn input =
+    match run parser input with
+    | Error _ as err -> err
+    | Ok (value, remaining) ->
+      Ok (f value, remaining)
+  in
+  Parser inner_fn
+
+let (|>>) = map
+
+(* Could be implemented with [bind] but doesn't cut it for me, even less with
+ * [>>=].
+ *
+ * let and_then parser1 parser2 =
+ *    parser1
+ *    |. bind (fun result1 ->
+ *      parser2
+ *      |. bind (fun result2 ->
+ *        return (result1, result2)))
+ *
+*)
 let and_then parser1 parser2 =
   let inner_fn input =
-    let result1 = run parser1 input in
-
-    match result1 with
-    | Error err -> Error err
+    match run parser1 input with
+    | Error _ as err -> err
     | Ok (value1, remaining1) ->
-      let result2 = run parser2 remaining1 in
-      match result2 with
-      | Error err -> Error err
+      match run parser2 remaining1 with
+      | Error _ as err -> err
       | Ok (value2, remaining2) ->
-        let value' = (value1, value2) in
-        Ok (value', remaining2)
+        Ok ((value1, value2), remaining2)
   in
 
   Parser inner_fn
 
 let (>>) = and_then
+
+let apply fparser xparser =
+  (fparser >> xparser)
+  |. map (fun (f, x) -> f x)
+
+let (<*>) = apply
 
 let or_else parser1 parser2 =
   let inner_fn input =
@@ -57,31 +101,6 @@ let or_else parser1 parser2 =
   Parser inner_fn
 
 let (<|>) = or_else
-
-exception Malformed of string
-
-let map parser f =
-  let inner_fn input =
-    match run parser input with
-    | Ok (value, remaining) ->
-      Ok (f value, remaining)
-    | Error err -> Error err
-  in
-  Parser inner_fn
-
-let (|>>) = map
-
-let return x =
-  let inner_fn input =
-    Ok (x, input)
-  in
-  Parser inner_fn
-
-let apply fparser xparser =
-  (fparser >> xparser)
-  |. map (fun (f, x) -> f x)
-
-let (<*>) = apply
 
 let lift2 f xp yp =
   return f <*> xp <*> yp

@@ -19,6 +19,9 @@ type 'a t = Parser of (stream -> (('a * stream), error) Belt.Result.t)
 
 val run : 'a t -> stream -> (('a * stream), error) Belt.Result.t
 
+val bind : 'a t -> ('a -> 'b t) -> 'b t
+val (>>=) : 'a t -> ('a -> 'b t) -> 'b t
+
 val map : 'a t -> ('a -> 'b) -> 'b t
 val (|>>) : 'a t -> ('a -> 'b) -> 'b t
 
