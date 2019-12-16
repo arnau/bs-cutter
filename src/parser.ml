@@ -23,40 +23,66 @@ end
 
 exception Malformed of string
 
+type label = string
 type error = string
 type stream = string
 type character = string
-type 'a t = Parser of (stream -> (('a * stream), error) Belt.Result.t)
+type 'a parser = stream -> ('a * stream, label * error) Belt.Result.t
+type 'a t = Parser of { parser : 'a parser; label : label }
 
-let run (Parser inner_fn) input =
-  inner_fn input
+let print_result result =
+  match result with
+  | Ok (value, input) ->
+    {j|$value|j}
+  | Error (label, error) ->
+    {j|Error parsing $label\nUnexpected $error|j}
+
+let set_label (Parser { parser }) new_label =
+  let inner_fn input =
+    match parser input with
+    | Ok _ as ok -> ok
+    | Error (_, err) ->
+      Error (new_label, err)
+  in
+  Parser { parser = inner_fn; label = new_label }
+
+let (<?>) = set_label
+
+let get_label (Parser { label }) =
+  label
+
+let run (Parser { parser }) input =
+  parser input
 
 let bind parser fn =
+  let label = "unknown" in
   let inner_fn input =
     match run parser input with
     | Error _ as err -> err
     | Ok (value, remaining) ->
       run (fn value) remaining
   in
-  Parser inner_fn
+  Parser { parser = inner_fn ; label }
 
 let (>>=) = bind
 
 let return x =
+  let label = "unknown" in
   let inner_fn input =
     Ok (x, input)
   in
-  Parser inner_fn
+  Parser { parser = inner_fn; label }
 
 
 let map parser f =
+  let label = get_label parser in
   let inner_fn input =
     match run parser input with
     | Error _ as err -> err
     | Ok (value, remaining) ->
       Ok (f value, remaining)
   in
-  Parser inner_fn
+  Parser { parser = inner_fn; label }
 
 let (|>>) = map
 
@@ -72,6 +98,9 @@ let (|>>) = map
  *
 *)
 let and_then parser1 parser2 =
+  let label1 = get_label parser1 in
+  let label2 = get_label parser2 in
+  let label = {j|$label1 and_then $label2|j} in
   let inner_fn input =
     match run parser1 input with
     | Error _ as err -> err
@@ -82,7 +111,7 @@ let and_then parser1 parser2 =
         Ok ((value1, value2), remaining2)
   in
 
-  Parser inner_fn
+  Parser { parser = inner_fn; label }
 
 let (>>) = and_then
 
@@ -93,12 +122,16 @@ let apply fparser xparser =
 let (<*>) = apply
 
 let or_else parser1 parser2 =
+  let label1 = get_label parser1 in
+  let label2 = get_label parser2 in
+  let label = {j|$label1 or_else $label2|j} in
   let inner_fn input =
     match run parser1 input with
     | Ok _ as res -> res
     | Error _ -> run parser2 input
   in
-  Parser inner_fn
+
+  Parser { parser = inner_fn; label }
 
 let (<|>) = or_else
 
@@ -124,30 +157,35 @@ let choice parser_list =
     Array.reduce rest p or_else
 
 let pchar ch =
-  let innerFn str =
+  let label = {j|pchar $ch|j} in
+  let inner_fn str =
     if String.is_empty str then
-      Result.Error "No more input"
+      Error (label, "No more input")
     else
       let first = String.get str 0 in
       if first = ch then
         let remaining = String.sliceToEnd ~from:1 str in
-        Result.Ok (ch, remaining)
+        Ok (ch, remaining)
       else
-        Result.Error {j|Expecting $ch. Got $first|j}
+        Error (label, {j|Expecting $ch. Got $first|j})
   in
-  Parser innerFn
+  Parser { parser = inner_fn; label }
 
 let any input =
+  let label = {j|any of $input|j} in
   input
   |. Array.map pchar
   |. choice
+  |. set_label label
 
 let pstring str =
+  let label = {j|pstring $str|j} in
   str
   |. String.to_list
   |. List.map pchar
   |. sequence
   |. map String.from_list
+  |. set_label label
 
 let rec parse_zero_or_more parser input =
   match run parser input with
@@ -158,21 +196,26 @@ let rec parse_zero_or_more parser input =
     (value :: values, remaining)
 
 let many parser =
-  let rec inner_fn input =
+  let old_label = get_label parser in
+  let label = {j|many $old_label|j} in
+  let inner_fn input =
     Ok (parse_zero_or_more parser input)
   in
-  Parser inner_fn
+  Parser { parser = inner_fn; label }
 
 let many1 parser =
+  let old_label = get_label parser in
+  let label = {j|many $old_label|j} in
   let inner_fn input =
     match run parser input with
-    | Error _ as err -> err
+    | Error (_, err) ->
+      Error (label, err)
     | Ok (value, input') ->
       let (values, remaining) =
         parse_zero_or_more parser input' in
       Ok (value :: values, remaining)
   in
-  Parser inner_fn
+  Parser { parser = inner_fn; label }
 
 let opt parser =
   let some = map parser (fun x -> Some x) in

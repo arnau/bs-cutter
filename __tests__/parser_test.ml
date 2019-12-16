@@ -12,7 +12,7 @@ let () =
 
       test "zbc" (fun () ->
           expect (run (pchar "A") "ZBC")
-          |> toEqual (Result.Error "Expecting A. Got Z"));
+          |> toEqual (Result.Error ("pchar A", "Expecting A. Got Z")));
 
     );
 

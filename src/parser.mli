@@ -12,21 +12,28 @@ module String : sig
   val from_list : t list -> t
 end
 
+type label = string
+
 (** A parsing error. *)
 type error = string
 
 (** A stream of characters to be parsed. *)
 type stream = string
 
+type 'a parser = stream -> ('a * stream, label * error) Belt.Result.t
+
 (** A character. Not using [char] because they are not utf-8 aware. *)
 type character = string
 
 (** A parser is a function of an input stream and results in a pair of the
     parsed fraction and the remaining stream. If it fails, returns an [Error]. *)
-type 'a t = Parser of (stream -> (('a * stream), error) Belt.Result.t)
+type 'a t = Parser of { parser : 'a parser; label : label }
+
+val set_label : 'a t -> label -> 'a t
+val (<?>) : 'a t -> label -> 'a t
 
 (** Consumes the given input with the given parser. *)
-val run : 'a t -> stream -> (('a * stream), error) Belt.Result.t
+val run : 'a t -> stream -> ('a * stream, label * error) Belt.Result.t
 
 (** Chains the result of a parser to another parser. *)
 val bind : 'a t -> ('a -> 'b t) -> 'b t
