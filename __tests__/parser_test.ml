@@ -12,7 +12,7 @@ let () =
 
       test "zbc" (fun () ->
           expect (run (pchar "A") "ZBC")
-          |> toEqual (Result.Error ("pchar A", "Expecting A. Got Z")));
+          |> toEqual (Result.Error ("A", "Unexpected Z.")));
 
     );
 
@@ -73,8 +73,7 @@ let () =
 
   describe "map" (fun () ->
       test "use a" (fun () ->
-          let pdigit = any [|"1"; "2"; "3"|] in
-          let parser = pdigit >> pdigit >> pdigit in
+          let parser = digit_char >> digit_char >> digit_char in
           let trans ((c1, c2), c3) =
             String.from_array [|c1; c2; c3|]
             |> Int.fromString
@@ -176,10 +175,9 @@ let () =
 
   describe "drop" (fun () ->
       test "drop whitespace" (fun () ->
-          let whitespace = any [|" "; "\t"; "\n"|] in
           let parser =
             (pstring "AB")
-            |. and_drop (many1 whitespace)
+            |. and_drop (many1 whitespace_char)
             |. and_then (pstring "CD")
           in
           expect (run parser "AB  CD")
@@ -189,12 +187,10 @@ let () =
 
   describe "between" (fun () ->
       test "quotes" (fun () ->
-          let whitespace = any [|" "; "\t"; "\n"|] in
-          let quote = pchar "\"" in
-          let text str = between quote (pstring str) quote in
+          let text str = between dquote_char (pstring str) dquote_char in
           let parser =
             (text "AB")
-            |. and_drop (many1 whitespace)
+            |. and_drop (many1 whitespace_char)
             |. and_then (text "CD")
           in
           expect (run parser "\"AB\"  \"CD\"")
@@ -204,8 +200,8 @@ let () =
 
   describe "sepby" (fun () ->
       test "list of digit" (fun () ->
-          let ws = any [|" "; "\t"; "\n"|] in
-          let comma = between (many ws) (pchar ",") (many ws) in
+          let ws = many whitespace_char in
+          let comma = between ws (pchar ",") ws in
           let parser =
             (sepby pint comma)
           in
@@ -213,10 +209,10 @@ let () =
           |> toEqual (Result.Ok ([1; 2; 3; 4], "")));
 
       test "set of ints" (fun () ->
-          let ws = any [|" "; "\t"; "\n"|] in
-          let comma = between (many ws) (pchar ",") (many ws) in
-          let obrace = pchar "{" |. and_drop (many ws) in
-          let cbrace = (many ws) |. drop_and (pchar "}") in
+          let ws = many whitespace_char in
+          let comma = between ws (pchar ",") ws in
+          let obrace = pchar "{" |. and_drop ws in
+          let cbrace = ws |. drop_and (pchar "}") in
           let parser =
             between obrace (sepby pint comma) cbrace
           in

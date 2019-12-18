@@ -10,6 +10,10 @@ module String : sig
   val from_array : t array -> t
 
   val from_list : t list -> t
+
+  val is_digit : t -> bool
+
+  val is_whitespace : t -> bool
 end
 
 type label = string
@@ -90,6 +94,7 @@ val sepby1 : 'a t -> 'b t -> 'a list t
 (** Parses zero or more occurences of a parser with a separator. *)
 val sepby : 'a t -> 'b t -> 'a list t
 
+val satisfy : (string -> bool) -> label -> string t
 
 val any : string array -> string t
 
@@ -97,6 +102,8 @@ val pchar : character -> character t
 
 val pstring : string -> string t
 
-val pdigit : character t
+val digit_char : character t
+val whitespace_char : character t
+val dquote_char : character t
 
 val pint : int t

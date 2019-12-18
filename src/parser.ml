@@ -19,6 +19,16 @@ module String = struct
 
   let from_list lst =
     String.concat "" lst
+
+  (** Should be in Char module *)
+  let is_digit ch =
+    match (length ch = 1, Int.fromString ch) with
+    | (false, _) -> false
+    | (_, None) -> false
+    | (true, Some _) -> true
+
+  let is_whitespace ch =
+    includes ch " \t\n"
 end
 
 exception Malformed of string
@@ -32,7 +42,7 @@ type 'a t = Parser of { parser : 'a parser; label : label }
 
 let print_result result =
   match result with
-  | Ok (value, input) ->
+  | Ok (value, _) ->
     {j|$value|j}
   | Error (label, error) ->
     {j|Error parsing $label\nUnexpected $error|j}
@@ -156,20 +166,25 @@ let choice parser_list =
     let rest = Array.sliceToEnd parser_list 1 in
     Array.reduce rest p or_else
 
-let pchar ch =
-  let label = {j|pchar $ch|j} in
-  let inner_fn str =
-    if String.is_empty str then
+let satisfy predicate label =
+  let inner_fn input =
+    if String.is_empty input then
       Error (label, "No more input")
     else
-      let first = String.get str 0 in
-      if first = ch then
-        let remaining = String.sliceToEnd ~from:1 str in
-        Ok (ch, remaining)
+      let first = String.get input 0 in
+      if predicate first then
+        let remaining = String.sliceToEnd ~from:1 input in
+        Ok (first, remaining)
       else
-        Error (label, {j|Expecting $ch. Got $first|j})
+        Error (label, {j|Unexpected $first.|j})
   in
   Parser { parser = inner_fn; label }
+
+
+let pchar input =
+  let label = {j|$input|j} in
+  let predicate ch = (ch = input) in
+  satisfy predicate label
 
 let any input =
   let label = {j|any of $input|j} in
@@ -247,8 +262,20 @@ let sepby1 parser sep =
 let sepby parser sep =
   sepby1 parser sep <|> (return [])
 
-let pdigit =
-  any [|"0";"1";"2";"3";"4";"5";"6";"7";"8";"9";|]
+let digit_char =
+  let predicate = String.is_digit in
+  let label = "digit" in
+  satisfy predicate label
+
+let whitespace_char =
+  let predicate = String.is_whitespace in
+  let label = "whitespace" in
+  satisfy predicate label
+
+let dquote_char =
+  let predicate ch = (ch = "\"") in
+  let label = "double quote" in
+  satisfy predicate label
 
 let pint =
   let to_int (sign, digit_list) =
@@ -262,7 +289,7 @@ let pint =
     | Some _ -> -i
     | None -> i
   in
-  let digits = many1 pdigit in
+  let digits = many1 digit_char in
 
   (opt (pchar "-") >> digits)
   |. map to_int
