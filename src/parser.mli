@@ -1,21 +1,3 @@
-module String : sig
-  type t = string
-
-  val is_empty : t -> bool
-
-  val to_array : t -> t array
-
-  val to_list : t -> t list
-
-  val from_array : t array -> t
-
-  val from_list : t list -> t
-
-  val is_digit : t -> bool
-
-  val is_whitespace : t -> bool
-end
-
 type label = string
 
 (** A parsing error. *)
