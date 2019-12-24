@@ -219,3 +219,24 @@ let () =
           expect (run parser "{ 1, 2 , 3, 4 }")
           |> toEqual (Result.Ok ([1; 2; 3; 4], "")));
     );
+
+  describe "read_all_chars" (fun () ->
+      test "empty" (fun () ->
+          expect (from_str "" |. read_all_chars)
+          |> toEqual []);
+
+      test "single" (fun () ->
+          expect (from_str "a" |. read_all_chars')
+          |> toEqual ["a"; "\n"]);
+
+      test "double" (fun () ->
+          expect (from_str "ab" |. read_all_chars)
+          |> toEqual ["a"; "b"; "\n"]);
+
+
+      test "two lines" (fun () ->
+          expect (from_str "a\nb" |. read_all_chars)
+          |> toEqual ["a"; "\n"; "b"; "\n"]);
+
+
+    );

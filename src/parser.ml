@@ -2,12 +2,87 @@ open Belt
 
 exception Malformed of string
 
-type label = string
 type error = string
+
+type label = string
+type position = {
+  line : int;
+  column : int;
+}
 type stream = string
 type character = string
+
+type input_state = {
+  lines : string array;
+  position : position;
+}
+
 type 'a parser = stream -> ('a * stream, label * error) Belt.Result.t
 type 'a t = Parser of { parser : 'a parser; label : label }
+
+let init_position =
+  { line = 0; column = 0 }
+
+let inc_col pos =
+  { pos with column = pos.column + 1 }
+
+let inc_line pos =
+  { line = pos.line + 1; column = 0 }
+
+let from_str str =
+  if String.is_empty str then
+    { lines = [||]; position = init_position }
+  else
+    (* let separators = [|"\r\n"; "\n"|] in *)
+    let lines = String.split "\n" str in
+    { lines; position = init_position }
+
+let current_line state =
+  let line_pos = state.position.line in
+  if line_pos < Array.length state.lines then
+    Array.getExn state.lines line_pos 
+  else
+    "end of file"
+
+let next_char input =
+  let line_pos = input.position.line in
+  let col_pos = input.position.column in
+  if line_pos >= Array.length input.lines then
+    (input, None)
+  else
+    let current_line = current_line input in
+    if col_pos < String.length current_line then
+      let ch = String.get current_line col_pos in
+      let new_pos = inc_col input.position in
+      let new_state = { input with position = new_pos } in
+      (new_state, Some ch)
+    else
+      let ch = "\n" in
+      let new_pos = inc_line input.position in
+      let new_state = { input with position = new_pos } in
+      (new_state, Some ch)
+
+let rec read_all_chars input =
+  let input', ch_opt = next_char input in
+  match ch_opt with
+  | None -> []
+  | Some ch ->
+    ch :: (read_all_chars input')
+
+let read_all_chars' input =
+  let res = ref [] in
+  let quit_loop = ref false in
+  let input_ref = ref input in
+  while not !quit_loop do
+    let input', ch_opt = next_char !input_ref in
+    input_ref := input';
+    match ch_opt with
+    | None ->
+      quit_loop := true
+    | Some ch ->
+      res := ch :: !res
+  done;
+  List.reverse !res
 
 let print_result result =
   match result with

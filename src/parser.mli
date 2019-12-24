@@ -6,6 +6,16 @@ type error = string
 (** A stream of characters to be parsed. *)
 type stream = string
 
+type position = {
+  line : int;
+  column : int;
+}
+
+type input_state = {
+  lines : string array;
+  position : position;
+}
+
 type 'a parser = stream -> ('a * stream, label * error) Belt.Result.t
 
 (** A character. Not using [char] because they are not utf-8 aware. *)
@@ -14,6 +24,21 @@ type character = string
 (** A parser is a function of an input stream and results in a pair of the
     parsed fraction and the remaining stream. If it fails, returns an [Error]. *)
 type 'a t = Parser of { parser : 'a parser; label : label }
+
+val init_position : position
+
+val inc_col : position -> position
+
+val inc_line : position -> position
+
+val from_str : string -> input_state
+
+val current_line : input_state -> string
+
+val next_char : input_state -> input_state * character option
+
+val read_all_chars : input_state -> string list
+val read_all_chars' : input_state -> string list
 
 val set_label : 'a t -> label -> 'a t
 val (<?>) : 'a t -> label -> 'a t
