@@ -3,10 +3,13 @@ type label = string
 (** A parsing error. *)
 type error = string
 
-(** A stream of characters to be parsed. *)
-type stream = string
-
 type position = {
+  line : int;
+  column : int;
+}
+
+type parser_position = {
+  current_line : string;
   line : int;
   column : int;
 }
@@ -16,7 +19,12 @@ type input_state = {
   position : position;
 }
 
-type 'a parser = stream -> ('a * stream, label * error) Belt.Result.t
+(** A stream of characters to be parsed. *)
+type stream = input_state
+
+type 'a parser_result = ('a * stream, label * error * parser_position) Belt.Result.t
+
+type 'a parser = stream -> 'a parser_result
 
 (** A character. Not using [char] because they are not utf-8 aware. *)
 type character = string
@@ -40,11 +48,14 @@ val next_char : input_state -> input_state * character option
 val read_all_chars : input_state -> string list
 val read_all_chars' : input_state -> string list
 
+val parser_position_from_input_state : input_state -> parser_position
+
 val set_label : 'a t -> label -> 'a t
 val (<?>) : 'a t -> label -> 'a t
 
 (** Consumes the given input with the given parser. *)
-val run : 'a t -> stream -> ('a * stream, label * error) Belt.Result.t
+val run_input : 'a t -> stream -> 'a parser_result
+val run : 'a t -> string -> 'a parser_result
 
 (** Chains the result of a parser to another parser. *)
 val bind : 'a t -> ('a -> 'b t) -> 'b t

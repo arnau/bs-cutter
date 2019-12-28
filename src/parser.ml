@@ -4,29 +4,42 @@ exception Malformed of string
 
 type error = string
 
-type label = string
 type position = {
   line : int;
   column : int;
 }
-type stream = string
-type character = string
+
+type parser_position = {
+  current_line : string;
+  line : int;
+  column : int;
+}
 
 type input_state = {
   lines : string array;
   position : position;
 }
 
-type 'a parser = stream -> ('a * stream, label * error) Belt.Result.t
-type 'a t = Parser of { parser : 'a parser; label : label }
+type label = string
+type stream = input_state
+type character = string
+
+type 'a parser_result = ('a * stream, label * error * parser_position) Belt.Result.t
+
+type 'a parser = stream -> 'a parser_result
+
+type 'a t = Parser of {
+    parser : 'a parser;
+    label : label
+  }
 
 let init_position =
   { line = 0; column = 0 }
 
-let inc_col pos =
+let inc_col (pos : position) =
   { pos with column = pos.column + 1 }
 
-let inc_line pos =
+let inc_line (pos : position) =
   { line = pos.line + 1; column = 0 }
 
 let from_str str =
@@ -40,7 +53,7 @@ let from_str str =
 let current_line state =
   let line_pos = state.position.line in
   if line_pos < Array.length state.lines then
-    Array.getExn state.lines line_pos 
+    Array.getExn state.lines line_pos
   else
     "end of file"
 
@@ -84,19 +97,30 @@ let read_all_chars' input =
   done;
   List.reverse !res
 
+let parser_position_from_input_state input_state = {
+  current_line = current_line input_state;
+  line = input_state.position.line;
+  column = input_state.position.column;
+}
+
 let print_result result =
   match result with
   | Ok (value, _) ->
     {j|$value|j}
-  | Error (label, error) ->
-    {j|Error parsing $label\nUnexpected $error|j}
+  | Error (label, error, parser_pos) ->
+    let error_line = parser_pos.current_line in
+    let col_pos = parser_pos.column in
+    let line_pos = parser_pos.line in
+    let span = String.repeat col_pos "" in
+    let failure_caret = {j|$span^$error|j} in
+    {j|Line:$line_pos Col:$col_pos Error parsing$label\n$error_line\n$failure_caret|j}
 
 let set_label (Parser { parser }) new_label =
   let inner_fn input =
     match parser input with
     | Ok _ as ok -> ok
-    | Error (_, err) ->
-      Error (new_label, err)
+    | Error (_, err, pos) ->
+      Error (new_label, err, pos)
   in
   Parser { parser = inner_fn; label = new_label }
 
@@ -105,16 +129,19 @@ let (<?>) = set_label
 let get_label (Parser { label }) =
   label
 
-let run (Parser { parser }) input =
+let run_input (Parser { parser }) input =
   parser input
+
+let run parser input =
+  run_input parser (from_str input)
 
 let bind parser fn =
   let label = "unknown" in
   let inner_fn input =
-    match run parser input with
+    match run_input parser input with
     | Error _ as err -> err
     | Ok (value, remaining) ->
-      run (fn value) remaining
+      run_input (fn value) remaining
   in
   Parser { parser = inner_fn ; label }
 
@@ -131,7 +158,7 @@ let return x =
 let map parser f =
   let label = get_label parser in
   let inner_fn input =
-    match run parser input with
+    match run_input parser input with
     | Error _ as err -> err
     | Ok (value, remaining) ->
       Ok (f value, remaining)
@@ -156,10 +183,10 @@ let and_then parser1 parser2 =
   let label2 = get_label parser2 in
   let label = {j|$label1 and_then $label2|j} in
   let inner_fn input =
-    match run parser1 input with
+    match run_input parser1 input with
     | Error _ as err -> err
     | Ok (value1, remaining1) ->
-      match run parser2 remaining1 with
+      match run_input parser2 remaining1 with
       | Error _ as err -> err
       | Ok (value2, remaining2) ->
         Ok ((value1, value2), remaining2)
@@ -180,9 +207,9 @@ let or_else parser1 parser2 =
   let label2 = get_label parser2 in
   let label = {j|$label1 or_else $label2|j} in
   let inner_fn input =
-    match run parser1 input with
+    match run_input parser1 input with
     | Ok _ as res -> res
-    | Error _ -> run parser2 input
+    | Error _ -> run_input parser2 input
   in
 
   Parser { parser = inner_fn; label }
@@ -212,15 +239,20 @@ let choice parser_list =
 
 let satisfy predicate label =
   let inner_fn input =
-    if String.is_empty input then
-      Error (label, "No more input")
-    else
-      let first = String.get input 0 in
+    let input', char_opt = next_char input in
+    match char_opt with
+    | None ->
+      let err = "No more input" in
+      let pos = parser_position_from_input_state input in
+      Error (label, err, pos)
+
+    | Some first ->
       if predicate first then
-        let remaining = String.sliceToEnd ~from:1 input in
-        Ok (first, remaining)
+        Ok (first, input')
       else
-        Error (label, {j|Unexpected $first.|j})
+        let err = {j|Unexpected $first.|j} in
+        let pos = parser_position_from_input_state input in
+        Error (label, err, pos)
   in
   Parser { parser = inner_fn; label }
 
@@ -247,7 +279,7 @@ let pstring str =
   |. set_label label
 
 let rec parse_zero_or_more parser input =
-  match run parser input with
+  match run_input parser input with
   | Error _ -> ([], input)
   | Ok (value, input') ->
     let (values, remaining) =
@@ -266,9 +298,9 @@ let many1 parser =
   let old_label = get_label parser in
   let label = {j|many $old_label|j} in
   let inner_fn input =
-    match run parser input with
-    | Error (_, err) ->
-      Error (label, err)
+    match run_input parser input with
+    | Error (_, err, pos) ->
+      Error (label, err, pos)
     | Ok (value, input') ->
       let (values, remaining) =
         parse_zero_or_more parser input' in

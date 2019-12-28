@@ -7,13 +7,27 @@ let () =
 
   describe "pchar" (fun () ->
       test "abc" (fun () ->
+          let remaining =
+            {
+              lines = [|"ABC"|];
+              position = {
+                column = 1;
+                line = 0;
+              }
+            } in
+
           expect (run (pchar "A") "ABC")
-          |> toEqual (Result.Ok ("A", "BC")));
+          |> toEqual (Result.Ok ("A", remaining)));
 
       test "zbc" (fun () ->
+          let remaining =
+            {
+              current_line = "ZBC";
+              column = 0;
+              line = 0;
+            } in
           expect (run (pchar "A") "ZBC")
-          |> toEqual (Result.Error ("A", "Unexpected Z.")));
-
+          |> toEqual (Result.Error ("A", "Unexpected Z.", remaining)));
     );
 
   describe "and_then" (fun () ->
@@ -23,14 +37,30 @@ let () =
             |. and_then (pchar "B")
             |. and_then (pchar "C")
           in
+          let remaining =
+            {
+              lines = [|"ABC"|];
+              position = {
+                column = 3;
+                line = 0;
+              }
+            } in
           expect (run (parseAB) "ABC")
-          |> toEqual (Result.Ok ((("A", "B"), "C"), "")));
+          |> toEqual (Result.Ok ((("A", "B"), "C"), remaining)));
 
       test "a then b" (fun () ->
           let parseA = pchar "A" in
           let parseB = pchar "B" in
+          let remaining =
+            {
+              lines = [|"ABC"|];
+              position = {
+                column = 2;
+                line = 0;
+              }
+            } in
           expect (run (parseA >> parseB) "ABC")
-          |> toEqual (Result.Ok (("A", "B"), "C")));
+          |> toEqual (Result.Ok (("A", "B"), remaining)));
 
     );
 
@@ -38,15 +68,30 @@ let () =
       test "a or b" (fun () ->
           let parseA = pchar "A" in
           let parseB = pchar "B" in
-
+          let remaining =
+            {
+              lines = [|"BCD"|];
+              position = {
+                column = 1;
+                line = 0;
+              }
+            } in
           expect (run (parseA <|> parseB) "BCD")
-          |> toEqual (Result.Ok ("B", "CD")));
+          |> toEqual (Result.Ok ("B", remaining)));
 
       test "a" (fun () ->
           let parseA = pchar "A" in
           let parseB = pchar "B" in
+          let remaining =
+            {
+              lines = [|"ABC"|];
+              position = {
+                column = 1;
+                line = 0;
+              }
+            } in
           expect (run (parseA <|> parseB) "ABC")
-          |> toEqual (Result.Ok ("A", "BC")));
+          |> toEqual (Result.Ok ("A", remaining)));
 
     );
 
@@ -56,18 +101,34 @@ let () =
           let parseB = pchar "B" in
           let parseC = pchar "C" in
           let parser = choice [|parseA; parseB; parseC|] in
+          let remaining =
+            {
+              lines = [|"AZZ"|];
+              position = {
+                column = 1;
+                line = 0;
+              }
+            } in
 
           expect (run parser "AZZ")
-          |> toEqual (Result.Ok ("A", "ZZ")));
+          |> toEqual (Result.Ok ("A", remaining)));
 
       test "use c" (fun () ->
           let parseA = pchar "A" in
           let parseB = pchar "B" in
           let parseC = pchar "C" in
           let parser = choice [|parseA; parseB; parseC|] in
+          let remaining =
+            {
+              lines = [|"CZZ"|];
+              position = {
+                column = 1;
+                line = 0;
+              }
+            } in
 
           expect (run parser "CZZ")
-          |> toEqual (Result.Ok ("C", "ZZ")));
+          |> toEqual (Result.Ok ("C", remaining)));
 
     );
 
@@ -78,26 +139,48 @@ let () =
             String.from_array [|c1; c2; c3|]
             |> Int.fromString
           in
-
+          let remaining =
+            {
+              lines = [|"1234"|];
+              position = {
+                column = 3;
+                line = 0;
+              }
+            } in
           expect (run (map parser trans) "1234")
-          |> toEqual (Result.Ok (Some 123, "4")));
+          |> toEqual (Result.Ok (Some 123, remaining)));
     );
 
   describe "sequence" (fun () ->
       test "take abc" (fun () ->
           let parsers = [pchar "A"; pchar "B"; pchar "C"] in
           let abc = sequence parsers in
+          let remaining =
+            {
+              lines = [|"ABCD"|];
+              position = {
+                column = 3;
+                line = 0;
+              }
+            } in
 
           expect (run abc "ABCD")
-          |> toEqual (Result.Ok (["A"; "B"; "C"], "D")));
+          |> toEqual (Result.Ok (["A"; "B"; "C"], remaining)));
     );
 
   describe "pstring" (fun () ->
       test "take abc" (fun () ->
           let abc = pstring "ABC" in
-
+          let remaining =
+            {
+              lines = [|"ABCD"|];
+              position = {
+                column = 3;
+                line = 0;
+              }
+            } in
           expect (run abc "ABCD")
-          |> toEqual (Result.Ok ("ABC", "D")));
+          |> toEqual (Result.Ok ("ABC", remaining)));
 
       test "fail abc" (fun () ->
           let abc = pstring "ABC" in
@@ -110,15 +193,29 @@ let () =
   describe "many" (fun () ->
       test "many ab" (fun () ->
           let ab = many (pstring "AB") in
-
+          let remaining =
+            {
+              lines = [|"ABABCD"|];
+              position = {
+                column = 4;
+                line = 0;
+              }
+            } in
           expect (run ab "ABABCD")
-          |> toEqual (Result.Ok (["AB"; "AB"], "CD")));
+          |> toEqual (Result.Ok (["AB"; "AB"], remaining)));
 
       test "no a" (fun () ->
           let parser = many (pchar "A") in
-
+          let remaining =
+            {
+              lines = [|"BCD"|];
+              position = {
+                column = 0;
+                line = 0;
+              }
+            } in
           expect (run parser "BCD")
-          |> toEqual (Result.Ok ([], "BCD")));
+          |> toEqual (Result.Ok ([], remaining)));
 
     );
 
@@ -126,9 +223,16 @@ let () =
       test "one or more number" (fun () ->
           let digit = any [| "1"; "2"; "3"; "4" |] in
           let digits = many1 digit in
-
+          let remaining =
+            {
+              lines = [|"12AB"|];
+              position = {
+                column = 2;
+                line = 0;
+              }
+            } in
           expect (run digits "12AB")
-          |> toEqual (Result.Ok (["1"; "2"], "AB")));
+          |> toEqual (Result.Ok (["1"; "2"], remaining)));
 
       test "fail one or more number" (fun () ->
           let digit = any [| "1"; "2"; "3"; "4" |] in
@@ -141,16 +245,40 @@ let () =
 
   describe "pint" (fun () ->
       test "one digit" (fun () ->
+          let remaining =
+            {
+              lines = [|"1AB"|];
+              position = {
+                column = 1;
+                line = 0;
+              }
+            } in
           expect (run pint "1AB")
-          |> toEqual (Result.Ok (1, "AB")));
+          |> toEqual (Result.Ok (1, remaining)));
 
       test "two digits" (fun () ->
+          let remaining =
+            {
+              lines = [|"13AB"|];
+              position = {
+                column = 2;
+                line = 0;
+              }
+            } in
           expect (run pint "13AB")
-          |> toEqual (Result.Ok (13, "AB")));
+          |> toEqual (Result.Ok (13, remaining)));
 
       test "negative digit" (fun () ->
+          let remaining =
+            {
+              lines = [|"-13AB"|];
+              position = {
+                column = 3;
+                line = 0;
+              }
+            } in
           expect (run pint "-13AB")
-          |> toEqual (Result.Ok (-13, "AB")));
+          |> toEqual (Result.Ok (-13, remaining)));
 
 
       test "no digit" (fun () ->
@@ -164,12 +292,28 @@ let () =
             pint
             |. and_drop (opt (pchar ";"))
           in
+          let remaining =
+            {
+              lines = [|"1;"|];
+              position = {
+                column = 2;
+                line = 0;
+              }
+            } in
           expect (run parser "1;")
-          |> toEqual (Result.Ok (1, "")));
+          |> toEqual (Result.Ok (1, remaining)));
 
       test "digit with no semicolon" (fun () ->
+          let remaining =
+            {
+              lines = [|"1A"|];
+              position = {
+                column = 1;
+                line = 0;
+              }
+            } in
           expect (run (pint >! opt (pchar ";")) "1A")
-          |> toEqual (Result.Ok (1, "A")));
+          |> toEqual (Result.Ok (1, remaining)));
 
     );
 
@@ -180,8 +324,16 @@ let () =
             |. and_drop (many1 whitespace_char)
             |. and_then (pstring "CD")
           in
+          let remaining =
+            {
+              lines = [|"AB  CD"|];
+              position = {
+                column = 6;
+                line = 0;
+              }
+            } in
           expect (run parser "AB  CD")
-          |> toEqual (Result.Ok (("AB", "CD"), "")));
+          |> toEqual (Result.Ok (("AB", "CD"), remaining)));
 
     );
 
@@ -193,8 +345,16 @@ let () =
             |. and_drop (many1 whitespace_char)
             |. and_then (text "CD")
           in
+          let remaining =
+            {
+              lines = [|"\"AB\"  \"CD\""|];
+              position = {
+                column = 10;
+                line = 0;
+              }
+            } in
           expect (run parser "\"AB\"  \"CD\"")
-          |> toEqual (Result.Ok (("AB", "CD"), "")));
+          |> toEqual (Result.Ok (("AB", "CD"), remaining)));
 
     );
 
@@ -205,8 +365,16 @@ let () =
           let parser =
             (sepby pint comma)
           in
+          let remaining =
+            {
+              lines = [|"1, 2 ,   3,4"|];
+              position = {
+                column = 12;
+                line = 0;
+              }
+            } in
           expect (run parser "1, 2 ,   3,4")
-          |> toEqual (Result.Ok ([1; 2; 3; 4], "")));
+          |> toEqual (Result.Ok ([1; 2; 3; 4], remaining)));
 
       test "set of ints" (fun () ->
           let ws = many whitespace_char in
@@ -216,8 +384,16 @@ let () =
           let parser =
             between obrace (sepby pint comma) cbrace
           in
-          expect (run parser "{ 1, 2 , 3, 4 }")
-          |> toEqual (Result.Ok ([1; 2; 3; 4], "")));
+          let remaining =
+            {
+              lines = [|"{ 1, 2, 3, 4 }"|];
+              position = {
+                column = 14;
+                line = 0;
+              }
+            } in
+          expect (run parser "{ 1, 2, 3, 4 }")
+          |> toEqual (Result.Ok ([1; 2; 3; 4], remaining)));
     );
 
   describe "read_all_chars" (fun () ->
