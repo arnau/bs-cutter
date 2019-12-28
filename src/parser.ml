@@ -111,9 +111,9 @@ let print_result result =
     let error_line = parser_pos.current_line in
     let col_pos = parser_pos.column in
     let line_pos = parser_pos.line in
-    let span = String.repeat col_pos "" in
+    let span = String.repeat col_pos " " in
     let failure_caret = {j|$span^$error|j} in
-    {j|Line:$line_pos Col:$col_pos Error parsing$label\n$error_line\n$failure_caret|j}
+    {j|Line:$line_pos Col:$col_pos Error parsing $label\n$error_line\n$failure_caret|j}
 
 let set_label (Parser { parser }) new_label =
   let inner_fn input =
@@ -250,7 +250,7 @@ let satisfy predicate label =
       if predicate first then
         Ok (first, input')
       else
-        let err = {j|Unexpected $first.|j} in
+        let err = {j|Unexpected "$first"|j} in
         let pos = parser_position_from_input_state input in
         Error (label, err, pos)
   in

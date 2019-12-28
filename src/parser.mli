@@ -57,6 +57,9 @@ val (<?>) : 'a t -> label -> 'a t
 val run_input : 'a t -> stream -> 'a parser_result
 val run : 'a t -> string -> 'a parser_result
 
+(* val print_result : ('a * 'b, 'c * 'd * parser_position) result -> string *)
+val print_result : 'a parser_result -> string
+
 (** Chains the result of a parser to another parser. *)
 val bind : 'a t -> ('a -> 'b t) -> 'b t
 val (>>=) : 'a t -> ('a -> 'b t) -> 'b t

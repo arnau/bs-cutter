@@ -27,7 +27,7 @@ let () =
               line = 0;
             } in
           expect (run (pchar "A") "ZBC")
-          |> toEqual (Result.Error ("A", "Unexpected Z.", remaining)));
+          |> toEqual (Result.Error ("A", "Unexpected \"Z\"", remaining)));
     );
 
   describe "and_then" (fun () ->
@@ -415,4 +415,13 @@ let () =
           |> toEqual ["a"; "\n"; "b"; "\n"]);
 
 
+    );
+
+  describe "print_result" (fun () ->
+      test "error" (fun () ->
+          let parser =
+            pchar "A" >> pchar "B" <?> "AB"
+          in
+          expect (run parser "A|C" |. print_result)
+          |> toEqual "Line:0 Col:1 Error parsing AB\nA|C\n ^Unexpected \"|\"");
     );
