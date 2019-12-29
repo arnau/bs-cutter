@@ -125,6 +125,9 @@ val pstring : string -> string t
 
 val digit_char : character t
 val whitespace_char : character t
+val spaces : string list t
+val spaces1 : string list t
 val dquote_char : character t
 
 val pint : int t
+val pfloat : float t

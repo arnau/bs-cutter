@@ -286,6 +286,33 @@ let () =
           |> toEqual true);
     );
 
+  describe "pfloat" (fun () ->
+      test "one digit" (fun () ->
+          let remaining =
+            {
+              lines = [|"1.0"|];
+              position = {
+                column = 3;
+                line = 0;
+              }
+            } in
+          expect (run pfloat "1.0")
+          |> toEqual (Result.Ok (1.0, remaining)));
+
+      test "negative" (fun () ->
+          let remaining =
+            {
+              lines = [|"-11.3AB"|];
+              position = {
+                column = 5;
+                line = 0;
+              }
+            } in
+          expect (run pfloat "-11.3AB")
+          |> toEqual (Result.Ok (-11.3, remaining)));
+    );
+
+
   describe "opt" (fun () ->
       test "digit with maybe a semicolon" (fun () ->
           let parser =

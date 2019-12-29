@@ -269,6 +269,7 @@ let any input =
   |. choice
   |. set_label label
 
+
 let pstring str =
   let label = {j|pstring $str|j} in
   str
@@ -348,12 +349,19 @@ let whitespace_char =
   let label = "whitespace" in
   satisfy predicate label
 
+let spaces =
+  many whitespace_char
+
+let spaces1 =
+  many1 whitespace_char
+
 let dquote_char =
   let predicate ch = (ch = "\"") in
   let label = "double quote" in
   satisfy predicate label
 
 let pint =
+  let label = "integer" in
   let to_int (sign, digit_list) =
     let i =
       digit_list
@@ -369,3 +377,24 @@ let pint =
 
   (opt (pchar "-") >> digits)
   |. map to_int
+  |. set_label label
+
+let pfloat =
+  let label = "float" in
+  let to_float (((sign, digits1), _point), digits2) =
+    let number = String.from_list digits1 in
+    let frac = String.from_list digits2 in
+    let f =
+      {j|$number.$frac|j}
+      |. Float.fromString
+      |. Option.getExn
+    in
+    match sign with
+    | Some _ -> -.f
+    | None -> f
+  in
+  let digits = many1 digit_char in
+
+  (opt (pchar "-") >> digits >> pchar "." >> digits)
+  |. map to_float
+  |. set_label label
