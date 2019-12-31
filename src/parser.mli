@@ -68,6 +68,8 @@ val (>>=) : 'a t -> ('a -> 'b t) -> 'b t
 val map : 'a t -> ('a -> 'b) -> 'b t
 val (|>>) : 'a t -> ('a -> 'b) -> 'b t
 
+val replace : 'a t -> 'b -> 'b t
+
 (** Wraps (lifts) a normal value into a parser. *)
 val return : 'a -> 'a t
 

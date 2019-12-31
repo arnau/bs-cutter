@@ -167,6 +167,11 @@ let map parser f =
 
 let (|>>) = map
 
+let replace parser value =
+  parser
+  |. map (fun _ -> value)
+
+
 (* Could be implemented with [bind] but doesn't cut it for me, even less with
  * [>>=].
  *
